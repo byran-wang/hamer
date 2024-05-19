@@ -17,7 +17,7 @@ setup(
         'torchvision',
         'yacs',
         #'detectron2 @ git+https://github.com/facebookresearch/detectron2',
-        'detectron2 @ git+https://github.com/facebookresearch/detectron2@82a57ce',
+        'detectron2 @ git+https://github.com/facebookresearch/detectron2.git@ff53992b1985b63bd3262b5a36167098e3dada02',
         'chumpy @ git+https://github.com/mattloper/chumpy',
         'mmcv==1.3.9',
         'timm',

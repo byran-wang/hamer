@@ -152,3 +152,6 @@ dmypy.json
 /example_data/
 /hamer_training_data
 *.ipynb
+
+out_demo/
+run_hamer.sh

@@ -174,7 +174,7 @@ def main():
 
     args = parser.parse_args()
     
-    args.img_folder = f'../data/{args.seq_name}/images'
+    args.img_folder = f'../data/{args.seq_name}/processed/images'
 
     # Download and load checkpoints
     download_models(CACHE_DIR_HAMER)
