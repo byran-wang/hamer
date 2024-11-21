@@ -486,9 +486,9 @@ def mano_param_processing(mano_params: Dict, has_mano_params: Dict, rot: float, 
     mano_params['global_orient'] = rot_aa(mano_params['global_orient'], rot)
     return mano_params, has_mano_params
 
+from typing import Union
 
-
-def get_example(img_path: str|np.ndarray, center_x: float, center_y: float,
+def get_example(img_path: Union[str, np.ndarray], center_x: float, center_y: float,
                 width: float, height: float,
                 keypoints_2d: np.array, keypoints_3d: np.array,
                 mano_params: Dict, has_mano_params: Dict,
