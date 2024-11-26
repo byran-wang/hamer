@@ -12,7 +12,8 @@ from .utils import get_example, expand_to_aspect_ratio
 
 def expand(s):
     return os.path.expanduser(os.path.expandvars(s))
-def expand_urls(urls: str|List[str]):
+from typing import Union
+def expand_urls(urls: Union[str, List[str]]):
     if isinstance(urls, str):
         urls = [urls]
     urls = [u for url in urls for u in braceexpand.braceexpand(expand(url))]
@@ -24,10 +25,11 @@ DEFAULT_MEAN = 255. * np.array([0.485, 0.456, 0.406])
 DEFAULT_STD = 255. * np.array([0.229, 0.224, 0.225])
 DEFAULT_IMG_SIZE = 256
 
+from typing import Union
 class ImageDataset(Dataset):
 
     @staticmethod
-    def load_tars_as_webdataset(cfg: CfgNode, urls: str|List[str], train: bool,
+    def load_tars_as_webdataset(cfg: CfgNode, urls: Union[str, List[str]], train: bool,
             resampled=False,
             epoch_size=None,
             cache_dir=None,
