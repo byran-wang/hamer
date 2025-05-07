@@ -32,7 +32,7 @@ def visualize_2d(results_2d):
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/2d_keypoints/')
+        out_p = im_p.replace("/rgb/", '/2d_keypoints/')
 
         im = Image.open(im_p)
 
@@ -50,7 +50,7 @@ def visualize_2d(results_2d):
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/hpe_vis/')
+        out_p = im_p.replace("/rgb/", '/hpe_vis/')
 
         im = Image.open(im_p)
 
@@ -175,7 +175,7 @@ def main():
 
     args = parser.parse_args()
     
-    args.img_folder = f'../data/{args.seq_name}/processed/images'
+    args.img_folder = f'../data/{args.seq_name}/rgb'
 
     # Download and load checkpoints
     download_models(CACHE_DIR_HAMER)
@@ -258,9 +258,9 @@ def main():
                         (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
                 
             # Save visualization
-            os.makedirs(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check', exist_ok=True)
+            os.makedirs(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/crop_image_check', exist_ok=True)
             img_name = os.path.basename(img_path)
-            cv2.imwrite(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check/{img_name}', vis_img)
+            cv2.imwrite(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/crop_image_check/{img_name}', vis_img)
             
 
         # Run reconstruction on all detected hands
