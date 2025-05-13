@@ -32,7 +32,7 @@ def visualize_2d(results_2d):
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/2d_keypoints/')
+        out_p = im_p.replace("/images/", '/processed/2d_keypoints/')
 
         im = Image.open(im_p)
 
@@ -50,7 +50,7 @@ def visualize_2d(results_2d):
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/hpe_vis/')
+        out_p = im_p.replace("/images/", '/processed/hpe_vis/')
 
         im = Image.open(im_p)
 
@@ -171,7 +171,6 @@ def main():
     parser.add_argument('--rescale_factor', type=float, default=2.0, help='Factor for padding the bbox')
     parser.add_argument('--body_detector', type=str, default='vitdet', choices=['vitdet', 'regnety'], help='Using regnety improves runtime and reduces memory')
     parser.add_argument('--file_type', nargs='+', default=['*.jpg', '*.png'], help='List of file extensions to consider')
-    parser.add_argument("--bbox_file", default="", type=str, help="bbox file")
 
     args = parser.parse_args()
     
@@ -216,15 +215,12 @@ def main():
 
     # Get all demo images ends with .jpg or .png
     img_paths = [img for end in args.file_type for img in Path(args.img_folder).glob(end)]
-    img_paths = sorted(img_paths)
     assert len(img_paths) > 0, f"No images found in {args.img_folder}"
 
     # Iterate over all images in folder
     print('Running inference on images')
     pred_list = []
-    bboxes_load = np.load(args.bbox_file)
-    for idx, img_path in enumerate(tqdm(img_paths)):
-        print(img_path)
+    for img_path in tqdm(img_paths):
         img_cv2 = cv2.imread(str(img_path))
 
         # Detect humans in image
@@ -242,26 +238,33 @@ def main():
             [np.concatenate([pred_bboxes, pred_scores[:, None]], axis=1)],
         )
 
+        bboxes = []
+        is_right = []
 
-        boxes = np.array(bboxes_load[idx])[None]
-        right = np.array([1])[None]
+        # Use hands based on hand keypoint detections
+        for vitposes in vitposes_out:
+            left_hand_keyp = vitposes['keypoints'][-42:-21]
+            right_hand_keyp = vitposes['keypoints'][-21:]
 
-        if 1:
-            # Visualize bounding boxes overlaid on image
-            vis_img = img_cv2.copy()
+            # Rejecting not confident detections
+            keyp = left_hand_keyp
+            valid = keyp[:,2] > 0.5
+            if sum(valid) > 3:
+                bbox = [keyp[valid,0].min(), keyp[valid,1].min(), keyp[valid,0].max(), keyp[valid,1].max()]
+                bboxes.append(bbox)
+                is_right.append(0)
+            keyp = right_hand_keyp
+            valid = keyp[:,2] > 0.5
+            if sum(valid) > 3:
+                bbox = [keyp[valid,0].min(), keyp[valid,1].min(), keyp[valid,0].max(), keyp[valid,1].max()]
+                bboxes.append(bbox)
+                is_right.append(1)
 
-            for box, is_right_hand in zip(boxes, right):
-                x1, y1, x2, y2 = box.astype(int)
-                color = (0, 255, 0) if is_right_hand else (0, 0, 255) # Green for right hand, red for left
-                cv2.rectangle(vis_img, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(vis_img, 'R' if is_right_hand else 'L', 
-                        (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                
-            # Save visualization
-            os.makedirs(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check', exist_ok=True)
-            img_name = os.path.basename(img_path)
-            cv2.imwrite(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check/{img_name}', vis_img)
-            
+        if len(bboxes) == 0:
+            continue
+
+        boxes = np.stack(bboxes)
+        right = np.stack(is_right)
 
         # Run reconstruction on all detected hands
         dataset = ViTDetDataset(model_cfg, img_cv2, boxes, right, rescale_factor=args.rescale_factor)
@@ -339,7 +342,6 @@ def main():
                 K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
                 pred_dict['K'] = K
                 pred_list.append(pred_dict)
-                print(len(pred_list))
 
                 # Save all meshes to disk
                 if args.save_mesh:
@@ -364,8 +366,8 @@ def main():
             cv2.imwrite(os.path.join(args.out_folder, f'{img_fn}_all.jpg'), 255*input_img_overlay[:, :, ::-1])
 
     import os.path as op
-    out_3d_p = op.join(args.img_folder, '../v3d.npy')
-    out_2d_p = op.join(args.img_folder, '../j2d.full.npy')
+    out_3d_p = op.join(args.img_folder, '../processed/v3d.npy')
+    out_2d_p = op.join(args.img_folder, '../processed/j2d.full.npy')
     # normalize paths
     out_3d_p = op.normpath(out_3d_p)
     out_2d_p = op.normpath(out_2d_p)
