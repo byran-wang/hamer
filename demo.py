@@ -32,7 +32,7 @@ def visualize_2d(results_2d):
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/processed/2d_keypoints/')
+        out_p = im_p.replace("/images/", '/2d_keypoints/')
 
         im = Image.open(im_p)
 
@@ -50,7 +50,7 @@ def visualize_2d(results_2d):
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/processed/hpe_vis/')
+        out_p = im_p.replace("/images/", '/hpe_vis/')
 
         im = Image.open(im_p)
 
@@ -366,8 +366,8 @@ def main():
             cv2.imwrite(os.path.join(args.out_folder, f'{img_fn}_all.jpg'), 255*input_img_overlay[:, :, ::-1])
 
     import os.path as op
-    out_3d_p = op.join(args.img_folder, '../processed/v3d.npy')
-    out_2d_p = op.join(args.img_folder, '../processed/j2d.full.npy')
+    out_3d_p = op.join(args.img_folder, '../v3d.npy')
+    out_2d_p = op.join(args.img_folder, '../j2d.full.npy')
     # normalize paths
     out_3d_p = op.normpath(out_3d_p)
     out_2d_p = op.normpath(out_2d_p)
