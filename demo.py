@@ -32,7 +32,7 @@ def visualize_2d(results_2d):
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/2d_keypoints/')
+        out_p = im_p.replace("/rgb/", '/2d_keypoints/')
 
         im = Image.open(im_p)
 
@@ -50,7 +50,7 @@ def visualize_2d(results_2d):
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/hpe_vis/')
+        out_p = im_p.replace("/rgb/", '/hpe_vis/')
 
         im = Image.open(im_p)
 
@@ -174,7 +174,7 @@ def main():
 
     args = parser.parse_args()
     
-    args.img_folder = f'../data/{args.seq_name}/processed/images'
+    args.img_folder = f'../data/{args.seq_name}/rgb'
 
     # Download and load checkpoints
     download_models(CACHE_DIR_HAMER)
@@ -215,12 +215,14 @@ def main():
 
     # Get all demo images ends with .jpg or .png
     img_paths = [img for end in args.file_type for img in Path(args.img_folder).glob(end)]
+    img_paths = sorted(img_paths)
     assert len(img_paths) > 0, f"No images found in {args.img_folder}"
 
     # Iterate over all images in folder
     print('Running inference on images')
     pred_list = []
-    for img_path in tqdm(img_paths):
+    for idx, img_path in enumerate(tqdm(img_paths)):
+        print(img_path)
         img_cv2 = cv2.imread(str(img_path))
 
         # Detect humans in image
@@ -342,6 +344,7 @@ def main():
                 K = np.array([[fx, 0, cx], [0, fy, cy], [0, 0, 1]])
                 pred_dict['K'] = K
                 pred_list.append(pred_dict)
+                print(f"pred_list len: {len(pred_list)}")
 
                 # Save all meshes to disk
                 if args.save_mesh:
