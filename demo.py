@@ -404,6 +404,9 @@ def main():
     out_2d_p = op.normpath(out_2d_p)
     os.makedirs(op.dirname(out_3d_p), exist_ok=True)
     results_3d, results_2d, mano_params = reform_pred_list(pred_list)
+    # due the mano layer using the smplx class, which the hand_pose input is substracted by the hand_mean, instead of smplx_layer using in the hamer.
+    for key, value in mano_params.items():
+        mano_params[key]['hand_pose'] -= model.mano.hand_mean[None].cpu().numpy()
 
     visualize_2d(results_2d)
     np.save(out_3d_p, results_3d)
