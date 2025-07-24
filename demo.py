@@ -10,6 +10,10 @@ from hamer.models import HAMER, download_models, load_hamer, DEFAULT_CHECKPOINT
 from hamer.utils import recursive_to
 from hamer.datasets.vitdet_dataset import ViTDetDataset, DEFAULT_MEAN, DEFAULT_STD
 from hamer.utils.renderer import Renderer, cam_crop_to_full
+import sys
+sys.path.append("../../code/")
+from common.rot import matrix_to_axis_angle
+from common.ld_utils import ld2dl
 
 LIGHT_BLUE=(0.65098039,  0.74117647,  0.85882353)
 
@@ -28,7 +32,7 @@ def visualize_2d(results_2d):
 
     im_paths = results_2d['im_paths']
 
-    print("Visualizing 2D keypoints")
+    print(f"Visualizing 2D keypoints in {out_p}")
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
@@ -46,7 +50,7 @@ def visualize_2d(results_2d):
         plt.savefig(out_p)
         plt.close()
 
-    print("Visualizing 2D vertices")
+    print(f"Visualizing 2D vertices in {out_p}")
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
@@ -104,6 +108,18 @@ def reform_pred_list(pred_list):
     joints_r = np.zeros((len(im_paths), 21, 3))*np.nan
     joints_l = np.copy(joints_r)
 
+    mano_params_r = {}
+    mano_params_r['global_orient'] = np.zeros((len(im_paths), 3))*np.nan
+    mano_params_r['hand_pose'] = np.zeros((len(im_paths), 45))*np.nan
+    mano_params_r['betas'] = np.zeros((len(im_paths), 10))*np.nan
+    mano_params_r['transl'] = np.zeros((len(im_paths), 3))*np.nan
+
+    mano_params_l = {}
+    mano_params_l['global_orient'] = np.zeros((len(im_paths), 3))*np.nan
+    mano_params_l['hand_pose'] = np.zeros((len(im_paths), 45))*np.nan
+    mano_params_l['betas'] = np.zeros((len(im_paths), 10))*np.nan
+    mano_params_l['transl'] = np.zeros((len(im_paths), 3))*np.nan
+
 
     for pred_dict in pred_list:
         is_right = bool(pred_dict['is_right'])
@@ -116,9 +132,17 @@ def reform_pred_list(pred_list):
         if is_right:
             verts_r[idx] = v3d_cam
             joints_r[idx] = j3d_cam
+            mano_params_r['global_orient'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['global_orient'].squeeze(0))).numpy()
+            mano_params_r['hand_pose'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['hand_pose'].squeeze(0))).numpy().reshape(-1)
+            mano_params_r['betas'][idx] = pred_dict['mano_params']['betas']
+            mano_params_r['transl'][idx] = np.array([0, 0, 1])
         else:
             verts_l[idx] = v3d_cam
             joints_l[idx] = j3d_cam
+            mano_params_l['global_orient'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['global_orient'].squeeze(0))).numpy()
+            mano_params_l['hand_pose'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['hand_pose'].squeeze(0))).numpy().reshape(-1)
+            mano_params_l['betas'][idx] = pred_dict['mano_params']['betas']
+            mano_params_l['transl'][idx] = pred_dict['mano_params']['transl']
 
     verts_r = verts_r.astype(np.float32)
     verts_l = verts_l.astype(np.float32)
@@ -151,8 +175,12 @@ def reform_pred_list(pred_list):
     results_2d['j2d.right'] = j2d_r
     results_2d['j2d.left'] = j2d_l
     results_2d['im_paths'] = im_paths
+
+    results_mano = {}
+    results_mano['right'] = mano_params_r
+    results_mano['left'] = mano_params_l
     
-    return results_3d, results_2d
+    return results_3d, results_2d, results_mano
 
 
 
@@ -330,12 +358,16 @@ def main():
                 all_verts.append(verts)
                 all_cam_t.append(cam_t)
                 all_right.append(is_right)
+                mano_params = {}
+                for key, v in out['pred_mano_params'].items():
+                    mano_params[key] = v.detach().cpu().numpy()                    
                 pred_dict = {}
                 pred_dict['cam_t.full'] = cam_t
                 pred_dict['verts'] = verts
                 pred_dict['jts'] = jts
                 pred_dict['is_right'] = is_right
                 pred_dict['img_path'] = str(img_path)
+                pred_dict['mano_params'] = mano_params
 
                 fx = fy = float(scaled_focal_length.cpu().numpy())
                 cx, cy = img_size[n].cpu().detach().numpy() / 2
@@ -368,16 +400,20 @@ def main():
     import os.path as op
     out_3d_p = op.join(args.img_folder, '../v3d.npy')
     out_2d_p = op.join(args.img_folder, '../j2d.full.npy')
+    out_mano_p = op.join(args.img_folder, '../hold_fit.init.npy')
     # normalize paths
     out_3d_p = op.normpath(out_3d_p)
     out_2d_p = op.normpath(out_2d_p)
     os.makedirs(op.dirname(out_3d_p), exist_ok=True)
-    results_3d, results_2d = reform_pred_list(pred_list)
+    results_3d, results_2d, mano_params = reform_pred_list(pred_list)
+
     visualize_2d(results_2d)
     np.save(out_3d_p, results_3d)
     np.save(out_2d_p, results_2d)
+    np.save(out_mano_p, mano_params)
     print(f"Saved 3D results to {out_3d_p}")
     print(f"Saved 2D results to {out_2d_p}")
+    print(f"Saved mano params to {out_mano_p}")
 
 if __name__ == '__main__':
     main()
