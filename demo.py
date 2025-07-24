@@ -32,7 +32,7 @@ def visualize_2d(results_2d):
 
     im_paths = results_2d['im_paths']
 
-    print(f"Visualizing 2D keypoints in {out_p}")
+    
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
@@ -49,8 +49,8 @@ def visualize_2d(results_2d):
         plt.legend(['jts_r', 'jts_l'])
         plt.savefig(out_p)
         plt.close()
-
-    print(f"Visualizing 2D vertices in {out_p}")
+    print(f"Visualizing 2D keypoints in {out_p}")
+    
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
@@ -67,6 +67,7 @@ def visualize_2d(results_2d):
         plt.legend(['mano_r', 'mano_l'])
         plt.savefig(out_p)
         plt.close()
+    print(f"Visualizing 2D vertices in {out_p}")
 
 
 def to_xy_batch(x_homo):
@@ -199,6 +200,7 @@ def main():
     parser.add_argument('--rescale_factor', type=float, default=2.0, help='Factor for padding the bbox')
     parser.add_argument('--body_detector', type=str, default='vitdet', choices=['vitdet', 'regnety'], help='Using regnety improves runtime and reduces memory')
     parser.add_argument('--file_type', nargs='+', default=['*.jpg', '*.png'], help='List of file extensions to consider')
+    parser.add_argument("--bbox_file", default="", type=str, help="bbox file")
 
     args = parser.parse_args()
     
@@ -243,12 +245,15 @@ def main():
 
     # Get all demo images ends with .jpg or .png
     img_paths = [img for end in args.file_type for img in Path(args.img_folder).glob(end)]
+    img_paths = sorted(img_paths)
     assert len(img_paths) > 0, f"No images found in {args.img_folder}"
 
     # Iterate over all images in folder
     print('Running inference on images')
     pred_list = []
-    for img_path in tqdm(img_paths):
+    bboxes_load = np.load(args.bbox_file)
+    for idx, img_path in enumerate(tqdm(img_paths)):
+        print(img_path)
         img_cv2 = cv2.imread(str(img_path))
 
         # Detect humans in image
@@ -266,33 +271,26 @@ def main():
             [np.concatenate([pred_bboxes, pred_scores[:, None]], axis=1)],
         )
 
-        bboxes = []
-        is_right = []
 
-        # Use hands based on hand keypoint detections
-        for vitposes in vitposes_out:
-            left_hand_keyp = vitposes['keypoints'][-42:-21]
-            right_hand_keyp = vitposes['keypoints'][-21:]
+        boxes = np.array(bboxes_load[idx])[None]
+        right = np.array([1])[None]
 
-            # Rejecting not confident detections
-            keyp = left_hand_keyp
-            valid = keyp[:,2] > 0.5
-            if sum(valid) > 3:
-                bbox = [keyp[valid,0].min(), keyp[valid,1].min(), keyp[valid,0].max(), keyp[valid,1].max()]
-                bboxes.append(bbox)
-                is_right.append(0)
-            keyp = right_hand_keyp
-            valid = keyp[:,2] > 0.5
-            if sum(valid) > 3:
-                bbox = [keyp[valid,0].min(), keyp[valid,1].min(), keyp[valid,0].max(), keyp[valid,1].max()]
-                bboxes.append(bbox)
-                is_right.append(1)
+        if 1:
+            # Visualize bounding boxes overlaid on image
+            vis_img = img_cv2.copy()
 
-        if len(bboxes) == 0:
-            continue
-
-        boxes = np.stack(bboxes)
-        right = np.stack(is_right)
+            for box, is_right_hand in zip(boxes, right):
+                x1, y1, x2, y2 = box.astype(int)
+                color = (0, 255, 0) if is_right_hand else (0, 0, 255) # Green for right hand, red for left
+                cv2.rectangle(vis_img, (x1, y1), (x2, y2), color, 2)
+                cv2.putText(vis_img, 'R' if is_right_hand else 'L', 
+                        (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
+                
+            # Save visualization
+            os.makedirs(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check', exist_ok=True)
+            img_name = os.path.basename(img_path)
+            cv2.imwrite(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check/{img_name}', vis_img)
+            
 
         # Run reconstruction on all detected hands
         dataset = ViTDetDataset(model_cfg, img_cv2, boxes, right, rescale_factor=args.rescale_factor)
