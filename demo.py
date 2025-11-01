@@ -275,7 +275,7 @@ def main():
         boxes = np.array(bboxes_load[idx])[None]
         right = np.array([1])[None]
 
-        if 1:
+        if 0:
             # Visualize bounding boxes overlaid on image
             vis_img = img_cv2.copy()
 
@@ -287,9 +287,9 @@ def main():
                         (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
                 
             # Save visualization
-            os.makedirs(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check', exist_ok=True)
+            os.makedirs(f'~/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check', exist_ok=True)
             img_name = os.path.basename(img_path)
-            cv2.imwrite(f'/home/simba/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check/{img_name}', vis_img)
+            cv2.imwrite(f'~/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check/{img_name}', vis_img)
             
 
         # Run reconstruction on all detected hands
