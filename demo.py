@@ -200,7 +200,6 @@ def main():
     parser.add_argument('--rescale_factor', type=float, default=2.0, help='Factor for padding the bbox')
     parser.add_argument('--body_detector', type=str, default='vitdet', choices=['vitdet', 'regnety'], help='Using regnety improves runtime and reduces memory')
     parser.add_argument('--file_type', nargs='+', default=['*.jpg', '*.png'], help='List of file extensions to consider')
-    parser.add_argument("--bbox_file", default="", type=str, help="bbox file")
 
     args = parser.parse_args()
     
@@ -251,9 +250,7 @@ def main():
     # Iterate over all images in folder
     print('Running inference on images')
     pred_list = []
-    bboxes_load = np.load(args.bbox_file)
-    for idx, img_path in enumerate(tqdm(img_paths)):
-        print(img_path)
+    for img_path in tqdm(img_paths):
         img_cv2 = cv2.imread(str(img_path))
 
         # Detect humans in image
@@ -271,26 +268,33 @@ def main():
             [np.concatenate([pred_bboxes, pred_scores[:, None]], axis=1)],
         )
 
+        bboxes = []
+        is_right = []
 
-        boxes = np.array(bboxes_load[idx])[None]
-        right = np.array([1])[None]
+        # Use hands based on hand keypoint detections
+        for vitposes in vitposes_out:
+            left_hand_keyp = vitposes['keypoints'][-42:-21]
+            right_hand_keyp = vitposes['keypoints'][-21:]
 
-        if 0:
-            # Visualize bounding boxes overlaid on image
-            vis_img = img_cv2.copy()
+            # Rejecting not confident detections
+            keyp = left_hand_keyp
+            valid = keyp[:,2] > 0.5
+            if sum(valid) > 3:
+                bbox = [keyp[valid,0].min(), keyp[valid,1].min(), keyp[valid,0].max(), keyp[valid,1].max()]
+                bboxes.append(bbox)
+                is_right.append(0)
+            keyp = right_hand_keyp
+            valid = keyp[:,2] > 0.5
+            if sum(valid) > 3:
+                bbox = [keyp[valid,0].min(), keyp[valid,1].min(), keyp[valid,0].max(), keyp[valid,1].max()]
+                bboxes.append(bbox)
+                is_right.append(1)
 
-            for box, is_right_hand in zip(boxes, right):
-                x1, y1, x2, y2 = box.astype(int)
-                color = (0, 255, 0) if is_right_hand else (0, 0, 255) # Green for right hand, red for left
-                cv2.rectangle(vis_img, (x1, y1), (x2, y2), color, 2)
-                cv2.putText(vis_img, 'R' if is_right_hand else 'L', 
-                        (x1, y1-10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, color, 2)
-                
-            # Save visualization
-            os.makedirs(f'~/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check', exist_ok=True)
-            img_name = os.path.basename(img_path)
-            cv2.imwrite(f'~/Documents/project/hold-private/code/data/{args.seq_name}/processed/crop_image_check/{img_name}', vis_img)
-            
+        if len(bboxes) == 0:
+            continue
+
+        boxes = np.stack(bboxes)
+        right = np.stack(is_right)
 
         # Run reconstruction on all detected hands
         dataset = ViTDetDataset(model_cfg, img_cv2, boxes, right, rescale_factor=args.rescale_factor)
