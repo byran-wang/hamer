@@ -134,17 +134,17 @@ def reform_pred_list(pred_list):
         if is_right:
             verts_r[idx] = v3d_cam
             joints_r[idx] = j3d_cam
-            mano_params_r['global_orient'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['global_orient'].squeeze(0))).numpy()
-            mano_params_r['hand_pose'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['hand_pose'].squeeze(0))).numpy().reshape(-1)
+            mano_params_r['global_orient'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['global_orient'])).numpy()
+            mano_params_r['hand_pose'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['hand_pose'])).numpy().reshape(-1)
             mano_params_r['betas'][idx] = pred_dict['mano_params']['betas']
             mano_params_r['transl'][idx] = np.array([0, 0, 1])
         else:
             verts_l[idx] = v3d_cam
             joints_l[idx] = j3d_cam
-            mano_params_l['global_orient'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['global_orient'].squeeze(0))).numpy()
-            mano_params_l['hand_pose'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['hand_pose'].squeeze(0))).numpy().reshape(-1)
+            mano_params_l['global_orient'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['global_orient'])).numpy()
+            mano_params_l['hand_pose'][idx] = matrix_to_axis_angle(torch.from_numpy(pred_dict['mano_params']['hand_pose'])).numpy().reshape(-1)
             mano_params_l['betas'][idx] = pred_dict['mano_params']['betas']
-            mano_params_l['transl'][idx] = pred_dict['mano_params']['transl']
+            mano_params_l['transl'][idx] = np.array([0, 0, 1])
 
     verts_r = verts_r.astype(np.float32)
     verts_l = verts_l.astype(np.float32)
@@ -215,7 +215,6 @@ def main():
     device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
     model = model.to(device)
     model.eval()
-
     # Load detector
     from hamer.utils.utils_detectron2 import DefaultPredictor_Lazy
     if args.body_detector == 'vitdet':
@@ -340,8 +339,10 @@ def main():
             scaled_focal_length = model_cfg.EXTRA.FOCAL_LENGTH / model_cfg.MODEL.IMAGE_SIZE * img_size.max()
             pred_cam_t_full = cam_crop_to_full(pred_cam, box_center, box_size, img_size, scaled_focal_length).detach().cpu().numpy()
 
-            # Render the result
-            batch_size = batch['img'].shape[0]
+            mano_params = {}
+            for key, v in out['pred_mano_params'].items():
+                mano_params[key] = v.detach().cpu().numpy()
+            batch_size = batch['img'].shape[0]               
             for n in range(batch_size):
                 # Get filename from path img_path
                 img_fn, _ = os.path.splitext(os.path.basename(img_path))
@@ -368,7 +369,7 @@ def main():
                 else:
                     final_img = np.concatenate([input_patch, regression_img], axis=1)
 
-                #cv2.imwrite(os.path.join(args.out_folder, f'{img_fn}_{person_id}.png'), 255*final_img[:, :, ::-1])
+                cv2.imwrite(os.path.join(args.out_folder, f'{img_fn}_{person_id}.png'), 255*final_img[:, :, ::-1])
 
                 # Add all verts and cams to list
                 verts = out['pred_vertices'][n].detach().cpu().numpy()
@@ -381,16 +382,18 @@ def main():
                 all_verts.append(verts)
                 all_cam_t.append(cam_t)
                 all_right.append(is_right)
-                mano_params = {}
-                for key, v in out['pred_mano_params'].items():
-                    mano_params[key] = v.detach().cpu().numpy()                    
+                 
                 pred_dict = {}
                 pred_dict['cam_t.full'] = cam_t
                 pred_dict['verts'] = verts
                 pred_dict['jts'] = jts
                 pred_dict['is_right'] = is_right
                 pred_dict['img_path'] = str(img_path)
-                pred_dict['mano_params'] = mano_params
+                pred_dict['mano_params'] = {
+                    'global_orient': mano_params['global_orient'][n],
+                    'hand_pose': mano_params['hand_pose'][n],
+                    'betas': mano_params['betas'][n],
+                }
 
                 fx = fy = float(scaled_focal_length.cpu().numpy())
                 cx, cy = img_size[n].cpu().detach().numpy() / 2
