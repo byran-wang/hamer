@@ -293,6 +293,7 @@ def main():
                 is_right.append(1)
 
         if len(bboxes) == 0:
+            print(f"[WARNING] No hands detected in {img_path}, skipping...")
             continue
 
         boxes = np.stack(bboxes)
@@ -400,7 +401,10 @@ def main():
             input_img_overlay = input_img[:,:,:3] * (1-cam_view[:,:,3:]) + cam_view[:,:,:3] * cam_view[:,:,3:]
 
             cv2.imwrite(os.path.join(args.out_folder, f'{img_fn}_all.jpg'), 255*input_img_overlay[:, :, ::-1])
-
+    
+    if len(pred_list) == 0:
+        print("[ERROR] No hands detected!")
+        return
     import os.path as op
     out_3d_p = op.join(args.img_folder, '../v3d.npy')
     out_2d_p = op.join(args.img_folder, '../j2d.full.npy')
