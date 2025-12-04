@@ -21,7 +21,7 @@ LIGHT_BLUE=(0.65098039,  0.74117647,  0.85882353)
 from vitpose_model import ViTPoseModel
 from tqdm import tqdm
 
-def visualize_2d(results_2d):
+def visualize_2d(results_2d, out_dir):
     from PIL import Image
     import matplotlib.pyplot as plt
     
@@ -33,31 +33,33 @@ def visualize_2d(results_2d):
 
     im_paths = results_2d['im_paths']
 
-    
+    out_p = f"{out_dir}/2d_keypoints"
+    os.makedirs(out_p, exist_ok=True)
+
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/2d_keypoints/')
+        im_name = os.path.basename(im_p)
 
         im = Image.open(im_p)
-
-        os.makedirs(os.path.dirname(out_p), exist_ok=True)
 
         plt.figure(figsize=(10, 10))
         plt.imshow(im)
         plt.scatter(j2d_r[idx, :, 0], j2d_r[idx, :, 1], s=10)
         plt.scatter(j2d_l[idx, :, 0], j2d_l[idx, :, 1], s=10)
         plt.legend(['jts_r', 'jts_l'])
-        plt.savefig(out_p)
+        plt.savefig(f"{out_p}/{im_name}")
         plt.close()
     print(f"Visualizing 2D keypoints in {out_p}")
     
+    out_p = f"{out_dir}/hpe_vis"
+    os.makedirs(out_p, exist_ok=True)
     for idx in tqdm(range(len(im_paths))):
 
         im_p = im_paths[idx]
-        out_p = im_p.replace("/images/", '/hpe_vis/')
 
         im = Image.open(im_p)
+        im_name = os.path.basename(im_p)
 
         os.makedirs(os.path.dirname(out_p), exist_ok=True)
 
@@ -66,7 +68,7 @@ def visualize_2d(results_2d):
         plt.scatter(v2d_r[idx, :, 0], v2d_r[idx, :, 1], s=1)
         plt.scatter(v2d_l[idx, :, 0], v2d_l[idx, :, 1], s=1)
         plt.legend(['mano_r', 'mano_l'])
-        plt.savefig(out_p)
+        plt.savefig(f"{out_p}/{im_name}")
         plt.close()
     print(f"Visualizing 2D vertices in {out_p}")
 
@@ -189,20 +191,8 @@ def reform_pred_list(pred_list):
 import json
 from typing import Dict, Optional
 
-def main():
-    parser = argparse.ArgumentParser(description='HaMeR demo code')
-    parser.add_argument('--checkpoint', type=str, default=DEFAULT_CHECKPOINT, help='Path to pretrained model checkpoint')
-    parser.add_argument('--seq_name', type=str, default='images', help='Folder with input images')
-    parser.add_argument('--img_folder', type=str, default=None, help='Folder with input images')
-    parser.add_argument('--out_folder', type=str, default='out_demo', help='Output folder to save rendered results')
-    parser.add_argument('--side_view', dest='side_view', action='store_true', default=False, help='If set, render side view also')
-    parser.add_argument('--full_frame', dest='full_frame', action='store_true', default=True, help='If set, render all people together also')
-    parser.add_argument('--save_mesh', dest='save_mesh', action='store_true', default=False, help='If set, save meshes to disk also')
-    parser.add_argument('--rescale_factor', type=float, default=2.0, help='Factor for padding the bbox')
-    parser.add_argument('--body_detector', type=str, default='vitdet', choices=['vitdet', 'regnety', 'wilor_yolo'], help='Using regnety improves runtime and reduces memory')
-    parser.add_argument('--file_type', nargs='+', default=['*.jpg', '*.png'], help='List of file extensions to consider')
+def main(args):
 
-    args = parser.parse_args()
 
     if args.img_folder is None:
         args.img_folder = f'../data/{args.seq_name}/processed/images'
@@ -358,18 +348,19 @@ def main():
                                         scene_bg_color=(1, 1, 1),
                                         )
 
-                if args.side_view:
-                    side_img = renderer(out['pred_vertices'][n].detach().cpu().numpy(),
-                                            out['pred_cam_t'][n].detach().cpu().numpy(),
-                                            white_img,
-                                            mesh_base_color=LIGHT_BLUE,
-                                            scene_bg_color=(1, 1, 1),
-                                            side_view=True)
-                    final_img = np.concatenate([input_patch, regression_img, side_img], axis=1)
-                else:
-                    final_img = np.concatenate([input_patch, regression_img], axis=1)
-
-                cv2.imwrite(os.path.join(args.out_folder, f'{img_fn}_{person_id}.png'), 255*final_img[:, :, ::-1])
+                if args.save_render:
+                    if args.side_view:
+                        side_img = renderer(out['pred_vertices'][n].detach().cpu().numpy(),
+                                                out['pred_cam_t'][n].detach().cpu().numpy(),
+                                                white_img,
+                                                mesh_base_color=LIGHT_BLUE,
+                                                scene_bg_color=(1, 1, 1),
+                                                side_view=True)
+                        final_img = np.concatenate([input_patch, regression_img, side_img], axis=1)
+                    else:
+                        final_img = np.concatenate([input_patch, regression_img], axis=1)
+                    os.makedirs(os.path.join(args.out_folder, 'renders'), exist_ok=True)
+                    cv2.imwrite(os.path.join(args.out_folder, 'renders', f'{img_fn}_{person_id}.png'), 255*final_img[:, :, ::-1])
 
                 # Add all verts and cams to list
                 verts = out['pred_vertices'][n].detach().cpu().numpy()
@@ -405,7 +396,8 @@ def main():
                 if args.save_mesh:
                     camera_translation = cam_t.copy()
                     tmesh = renderer.vertices_to_trimesh(verts, camera_translation, LIGHT_BLUE, is_right=is_right)
-                    tmesh.export(os.path.join(args.out_folder, f'{img_fn}_{person_id}.obj'))
+                    os.makedirs(os.path.join(args.out_folder, 'meshes'), exist_ok=True)
+                    tmesh.export(os.path.join(args.out_folder, 'meshes', f'{img_fn}_{person_id}.obj'))
 
         # Render front view
         if args.full_frame and len(all_verts) > 0:
@@ -421,15 +413,16 @@ def main():
             input_img = np.concatenate([input_img, np.ones_like(input_img[:,:,:1])], axis=2) # Add alpha channel
             input_img_overlay = input_img[:,:,:3] * (1-cam_view[:,:,3:]) + cam_view[:,:,:3] * cam_view[:,:,3:]
 
-            cv2.imwrite(os.path.join(args.out_folder, f'{img_fn}_all.jpg'), 255*input_img_overlay[:, :, ::-1])
+            os.makedirs(os.path.join(args.out_folder, "renders"), exist_ok=True)
+            cv2.imwrite(os.path.join(args.out_folder, "renders", f'{img_fn}_all.jpg'), 255*input_img_overlay[:, :, ::-1])
     
     if len(pred_list) == 0:
         print("[ERROR] No hands detected!")
         return
     import os.path as op
-    out_3d_p = op.join(args.img_folder, '../v3d.npy')
-    out_2d_p = op.join(args.img_folder, '../j2d.full.npy')
-    out_mano_p = op.join(args.img_folder, '../hold_fit.init.npy')
+    out_3d_p = op.join(args.out_folder, 'v3d.npy')
+    out_2d_p = op.join(args.out_folder, 'j2d.full.npy')
+    out_mano_p = op.join(args.out_folder, 'hold_fit.init.npy')
     # normalize paths
     out_3d_p = op.normpath(out_3d_p)
     out_2d_p = op.normpath(out_2d_p)
@@ -439,7 +432,7 @@ def main():
     for key, value in mano_params.items():
         mano_params[key]['hand_pose'] -= model.mano.hand_mean[None].cpu().numpy()
 
-    visualize_2d(results_2d)
+    visualize_2d(results_2d, args.out_folder)
     np.save(out_3d_p, results_3d)
     np.save(out_2d_p, results_2d)
     np.save(out_mano_p, mano_params)
@@ -448,4 +441,18 @@ def main():
     print(f"Saved mano params to {out_mano_p}")
 
 if __name__ == '__main__':
-    main()
+    parser = argparse.ArgumentParser(description='HaMeR demo code')
+    parser.add_argument('--checkpoint', type=str, default=DEFAULT_CHECKPOINT, help='Path to pretrained model checkpoint')
+    parser.add_argument('--seq_name', type=str, default='images', help='Folder with input images')
+    parser.add_argument('--img_folder', type=str, default=None, help='Folder with input images')
+    parser.add_argument('--out_folder', type=str, default='out_demo', help='Output folder to save rendered results')
+    parser.add_argument('--side_view', dest='side_view', action='store_true', default=False, help='If set, render side view also')
+    parser.add_argument('--full_frame', dest='full_frame', action='store_true', default=False, help='If set, render all people together also')
+    parser.add_argument('--save_mesh', dest='save_mesh', action='store_true', default=False, help='If set, save meshes to disk also')
+    parser.add_argument('--save_render', dest='save_render', action='store_true', default=False, help='If set, save rendered images to disk')
+    parser.add_argument('--rescale_factor', type=float, default=2.0, help='Factor for padding the bbox')
+    parser.add_argument('--body_detector', type=str, default='vitdet', choices=['vitdet', 'regnety', 'wilor_yolo'], help='Using regnety improves runtime and reduces memory')
+    parser.add_argument('--file_type', nargs='+', default=['*.jpg', '*.png'], help='List of file extensions to consider')
+
+    args = parser.parse_args()    
+    main(args)
