@@ -126,6 +126,8 @@ def reform_pred_list(pred_list):
 
 
     for pred_dict in pred_list:
+        if "is_right" not in pred_dict:
+            continue
         is_right = bool(pred_dict['is_right'])
 
         v3d_cam = pred_dict['verts']  + pred_dict['cam_t.full'][None, :]
@@ -240,8 +242,12 @@ def main(args):
     # Make output directory if it does not exist
     os.makedirs(args.out_folder, exist_ok=True)
 
-    # Get all demo images ends with .jpg or .png
-    img_paths = [img for end in args.file_type for img in Path(args.img_folder).glob(end)]
+    # Collect only files starting with the prefix and matching desired extensions.
+    img_dir = Path(args.img_folder)
+    allowed_suffixes = {'.jpg', '.png'}
+    img_paths = [p for p in img_dir.glob('214-1*') if p.suffix.lower() in allowed_suffixes]
+
+    
     img_paths = sorted(img_paths)
     assert len(img_paths) > 0, f"No images found in {args.img_folder}"
 
@@ -300,6 +306,9 @@ def main(args):
                 bboxes.append(Bbox[:4].tolist())
 
         if len(bboxes) == 0:
+            pred_dict = {}
+            pred_dict['img_path'] = str(img_path)
+            pred_list.append(pred_dict)
             print(f"[WARNING] No hands detected in {img_path}, skipping...")
             continue
 
