@@ -245,7 +245,7 @@ def main(args):
     # Collect only files starting with the prefix and matching desired extensions.
     img_dir = Path(args.img_folder)
     allowed_suffixes = {'.jpg', '.png'}
-    img_paths = [p for p in img_dir.glob('214-1*') if p.suffix.lower() in allowed_suffixes]
+    img_paths = [p for p in img_dir.glob('*') if p.suffix.lower() in allowed_suffixes]
 
     
     img_paths = sorted(img_paths)
