@@ -1,4 +1,5 @@
 # Specific
+pretrained_models
 /logs*/
 /results/
 /sandbox/

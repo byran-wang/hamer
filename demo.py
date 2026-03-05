@@ -11,10 +11,8 @@ from hamer.models import HAMER, download_models, load_hamer, DEFAULT_CHECKPOINT
 from hamer.utils import recursive_to
 from hamer.datasets.vitdet_dataset import ViTDetDataset, DEFAULT_MEAN, DEFAULT_STD
 from hamer.utils.renderer import Renderer, cam_crop_to_full
-import sys
-sys.path.append("../../code/")
-from common.rot import matrix_to_axis_angle
-from common.ld_utils import ld2dl
+
+from rot import matrix_to_axis_angle
 
 LIGHT_BLUE=(0.65098039,  0.74117647,  0.85882353)
 
