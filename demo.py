@@ -348,12 +348,15 @@ def main(args):
                 input_patch = batch['img'][n].cpu() * (DEFAULT_STD[:,None,None]/255) + (DEFAULT_MEAN[:,None,None]/255)
                 input_patch = input_patch.permute(1,2,0).numpy()
 
-                regression_img = renderer(out['pred_vertices'][n].detach().cpu().numpy(),
-                                        out['pred_cam_t'][n].detach().cpu().numpy(),
-                                        batch['img'][n],
-                                        mesh_base_color=LIGHT_BLUE,
-                                        scene_bg_color=(1, 1, 1),
-                                        )
+                try:
+                    regression_img = renderer(out['pred_vertices'][n].detach().cpu().numpy(),
+                                            out['pred_cam_t'][n].detach().cpu().numpy(),
+                                            batch['img'][n],
+                                            mesh_base_color=LIGHT_BLUE,
+                                            scene_bg_color=(1, 1, 1),
+                                            )
+                except:
+                    regression_img = None
 
                 if args.save_render:
                     if args.side_view:
@@ -363,9 +366,15 @@ def main(args):
                                                 mesh_base_color=LIGHT_BLUE,
                                                 scene_bg_color=(1, 1, 1),
                                                 side_view=True)
-                        final_img = np.concatenate([input_patch, regression_img, side_img], axis=1)
+                        if regression_img != None:
+                            final_img = np.concatenate([input_patch, regression_img, side_img], axis=1)
+                        else:
+                            final_img = np.concatenate([input_patch, side_img], axis=1)
                     else:
-                        final_img = np.concatenate([input_patch, regression_img], axis=1)
+                        if regression_img != None:
+                            final_img = np.concatenate([input_patch, regression_img], axis=1)
+                        else:
+                            final_img = np.concatenate([input_patch], axis=1)
                     os.makedirs(os.path.join(args.out_folder, 'renders'), exist_ok=True)
                     cv2.imwrite(os.path.join(args.out_folder, 'renders', f'{img_fn}_{person_id}.png'), 255*final_img[:, :, ::-1])
 
@@ -408,20 +417,23 @@ def main(args):
 
         # Render front view
         if args.full_frame and len(all_verts) > 0:
-            misc_args = dict(
-                mesh_base_color=LIGHT_BLUE,
-                scene_bg_color=(1, 1, 1),
-                focal_length=scaled_focal_length,
-            )
-            cam_view = renderer.render_rgba_multiple(all_verts, cam_t=all_cam_t, render_res=img_size[n], is_right=all_right, **misc_args)
+            try:
+                misc_args = dict(
+                    mesh_base_color=LIGHT_BLUE,
+                    scene_bg_color=(1, 1, 1),
+                    focal_length=scaled_focal_length,
+                )
+                cam_view = renderer.render_rgba_multiple(all_verts, cam_t=all_cam_t, render_res=img_size[n], is_right=all_right, **misc_args)
 
-            # Overlay image
-            input_img = img_cv2.astype(np.float32)[:,:,::-1]/255.0
-            input_img = np.concatenate([input_img, np.ones_like(input_img[:,:,:1])], axis=2) # Add alpha channel
-            input_img_overlay = input_img[:,:,:3] * (1-cam_view[:,:,3:]) + cam_view[:,:,:3] * cam_view[:,:,3:]
+                # Overlay image
+                input_img = img_cv2.astype(np.float32)[:,:,::-1]/255.0
+                input_img = np.concatenate([input_img, np.ones_like(input_img[:,:,:1])], axis=2) # Add alpha channel
+                input_img_overlay = input_img[:,:,:3] * (1-cam_view[:,:,3:]) + cam_view[:,:,:3] * cam_view[:,:,3:]
 
-            os.makedirs(os.path.join(args.out_folder, "renders"), exist_ok=True)
-            cv2.imwrite(os.path.join(args.out_folder, "renders", f'{img_fn}_all.jpg'), 255*input_img_overlay[:, :, ::-1])
+                os.makedirs(os.path.join(args.out_folder, "renders"), exist_ok=True)
+                cv2.imwrite(os.path.join(args.out_folder, "renders", f'{img_fn}_all.jpg'), 255*input_img_overlay[:, :, ::-1])
+            except Exception as e:
+                print(f"[WARNING] Skipping render (no display/EGL available): {e}")
     
     if len(pred_list) == 0:
         print("[ERROR] No hands detected!")

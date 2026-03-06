@@ -55,8 +55,12 @@ class HAMER(pl.LightningModule):
         self.register_buffer('initialized', torch.tensor(False))
         # Setup renderer for visualization
         if init_renderer:
-            self.renderer = SkeletonRenderer(self.cfg)
-            self.mesh_renderer = MeshRenderer(self.cfg, faces=self.mano.faces)
+            try:
+                self.renderer = SkeletonRenderer(self.cfg)
+                self.mesh_renderer = MeshRenderer(self.cfg, faces=self.mano.faces)
+            except:
+                self.renderer = None
+                self.mesh_renderer = None                
         else:
             self.renderer = None
             self.mesh_renderer = None
