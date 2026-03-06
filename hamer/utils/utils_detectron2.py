@@ -1,8 +1,8 @@
-import detectron2.data.transforms as T
+# import detectron2.data.transforms as T
 import torch
-from detectron2.checkpoint import DetectionCheckpointer
-from detectron2.config import CfgNode, instantiate
-from detectron2.data import MetadataCatalog
+# from detectron2.checkpoint import DetectionCheckpointer
+# from detectron2.config import CfgNode, instantiate
+# from detectron2.data import MetadataCatalog
 from omegaconf import OmegaConf
 
 
