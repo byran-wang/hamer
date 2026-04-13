@@ -459,6 +459,14 @@ def main(args):
     print(f"Saved 2D results to {out_2d_p}")
     print(f"Saved mano params to {out_mano_p}")
 
+    # Save frame_list.txt with frame indices (numeric stem only, no path)
+    frame_list_path = op.join(args.out_folder, 'frame_list.txt')
+    with open(frame_list_path, 'w') as f:
+        for im_path in results_3d['im_paths']:
+            frame_idx = Path(im_path).stem
+            f.write(f"{frame_idx}\n")
+    print(f"Saved frame list to {frame_list_path}")
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='HaMeR demo code')
     parser.add_argument('--checkpoint', type=str, default=DEFAULT_CHECKPOINT, help='Path to pretrained model checkpoint')
