@@ -303,6 +303,29 @@ def main(args):
                 is_right.append(det.boxes.cls.cpu().detach().squeeze().item())
                 bboxes.append(Bbox[:4].tolist())
 
+        # Filter detections by intersection with hand mask (reject if < 20%)
+        mask_path = Path(str(img_path).replace('/rgb/', '/mask_hand/').replace(".jpg", ".png"))
+        if mask_path.exists() and len(bboxes) > 0:
+            hand_mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+            if hand_mask is not None:
+                H_m, W_m = hand_mask.shape
+                filtered_bboxes = []
+                filtered_is_right = []
+                for bbox, ir in zip(bboxes, is_right):
+                    x1, y1, x2, y2 = int(max(0, bbox[0])), int(max(0, bbox[1])), int(min(W_m, bbox[2])), int(min(H_m, bbox[3]))
+                    if x2 <= x1 or y2 <= y1:
+                        continue
+                    bbox_area = (x2 - x1) * (y2 - y1)
+                    mask_in_bbox = (hand_mask[y1:y2, x1:x2] > 0).sum()
+                    iou = mask_in_bbox / bbox_area if bbox_area > 0 else 0
+                    if iou >= 0.2:
+                        filtered_bboxes.append(bbox)
+                        filtered_is_right.append(ir)
+                    else:
+                        print(f"[FILTER] Rejected bbox {bbox} (mask overlap {iou:.2f} < 0.5) in {img_path.name}")
+                bboxes = filtered_bboxes
+                is_right = filtered_is_right
+
         if len(bboxes) == 0:
             pred_dict = {}
             pred_dict['img_path'] = str(img_path)
