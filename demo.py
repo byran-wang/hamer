@@ -452,12 +452,45 @@ def main(args):
         mano_params[key]['hand_pose'] -= model.mano.hand_mean[None].cpu().numpy()
 
     visualize_2d(results_2d, args.out_folder)
-    np.save(out_3d_p, results_3d)
-    np.save(out_2d_p, results_2d)
-    np.save(out_mano_p, mano_params)
-    print(f"Saved 3D results to {out_3d_p}")
-    print(f"Saved 2D results to {out_2d_p}")
-    print(f"Saved mano params to {out_mano_p}")
+
+    # Pack results indexed by frame number (NaN for frames without detections)
+    frame_ids = [int(Path(p).stem) for p in results_3d['im_paths']]
+    N = max(frame_ids) + 1  # total slots
+
+    def _reindex(arr, frame_ids, N):
+        """Create a NaN-filled array of size N and place values at frame_ids."""
+        arr_np = arr.numpy() if isinstance(arr, torch.Tensor) else np.asarray(arr)
+        out = np.full((N,) + arr_np.shape[1:], np.nan, dtype=np.float32)
+        for new_i, fid in enumerate(frame_ids):
+            out[fid] = arr_np[new_i]
+        return out
+
+    results_3d_packed = {
+        'v3d.right': _reindex(results_3d['v3d.right'], frame_ids, N),
+        'v3d.left': _reindex(results_3d['v3d.left'], frame_ids, N),
+        'j3d.right': _reindex(results_3d['j3d.right'], frame_ids, N),
+        'j3d.left': _reindex(results_3d['j3d.left'], frame_ids, N),
+        'K': results_3d['K'],
+    }
+    results_2d_packed = {
+        'v2d.right': _reindex(results_2d['v2d.right'], frame_ids, N),
+        'v2d.left': _reindex(results_2d['v2d.left'], frame_ids, N),
+        'j2d.right': _reindex(results_2d['j2d.right'], frame_ids, N),
+        'j2d.left': _reindex(results_2d['j2d.left'], frame_ids, N),
+    }
+    mano_params_packed = {}
+    for hand_key in ('right', 'left'):
+        mano_params_packed[hand_key] = {}
+        for param_key in ('global_orient', 'hand_pose', 'betas', 'transl'):
+            mano_params_packed[hand_key][param_key] = _reindex(
+                mano_params[hand_key][param_key], frame_ids, N)
+
+    np.save(out_3d_p, results_3d_packed)
+    np.save(out_2d_p, results_2d_packed)
+    np.save(out_mano_p, mano_params_packed)
+    print(f"Saved packed 3D results ({N} frames) to {out_3d_p}")
+    print(f"Saved packed 2D results ({N} frames) to {out_2d_p}")
+    print(f"Saved packed mano params ({N} frames) to {out_mano_p}")
 
     # Save frame_list.txt with frame indices (numeric stem only, no path)
     frame_list_path = op.join(args.out_folder, 'frame_list.txt')
