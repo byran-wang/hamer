@@ -323,6 +323,11 @@ def main(args):
                         filtered_is_right.append(ir)
                     else:
                         print(f"[FILTER] Rejected bbox {bbox} (mask overlap {iou:.2f} < 0.5) in {img_path.name}")
+
+                if len(filtered_bboxes) == 0:
+                    filtered_bboxes = bboxes
+                    filtered_is_right = is_right                        
+
                 bboxes = filtered_bboxes
                 is_right = filtered_is_right
 
